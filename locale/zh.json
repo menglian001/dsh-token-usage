@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Token 用量",
+    "description": "展示每个会话的 provider 计费 token 用量。"
+  }
+}

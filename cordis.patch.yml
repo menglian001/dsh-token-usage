@@ -1,0 +1,15 @@
+# dsh-token-usage bundle patch: the layer applied when a profile lists this bundle.
+#
+# The row carries no configuration. The Host half registers one session
+# projection (`requestLog`) and keeps a durable ledger under
+# `$DSH_HOME/token-usage/` (append-only between startups; compacted at startup
+# when it is small enough and carries superseded or expired rows).
+# `GET /token-usage/ledger` serves it back: registered only when the composition
+# provides both `webServer` and `connection`, authenticated with the browser
+# cookie, GET/HEAD only, and it answers 404 rather than serving unauthenticated
+# when no connection service is present. The Client half draws the panel from
+# those two sources.
+
+- insert:
+    - id: token-usage
+      name: dsh-token-usage

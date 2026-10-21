@@ -1,0 +1,15 @@
+# Dependencies installed by the profile, not by this package
+node_modules/
+package-lock.json
+
+# Local data: the durable ledger never belongs in git
+*.jsonl
+*.jsonl.compacting
+data/
+
+# Editor and OS noise
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/

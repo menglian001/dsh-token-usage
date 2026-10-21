@@ -1,0 +1,57 @@
+{
+  "name": "dsh-token-usage",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Token usage panel for the DeepSeek Harness Web GUI: a per-request ledger, four-bucket totals, a year heat map and durable JSONL storage.",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "token-usage",
+    "usage-tracking",
+    "plugin",
+    "observability"
+  ],
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json"
+  ],
+  "scripts": {
+    "test": "node test/run-all.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/menglian001/dsh-token-usage.git"
+  },
+  "homepage": "https://github.com/menglian001/dsh-token-usage#readme",
+  "bugs": {
+    "url": "https://github.com/menglian001/dsh-token-usage/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
