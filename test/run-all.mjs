@@ -11,9 +11,21 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
+
+/**
+ * The install acceptance runs a real npm install in a temp directory, so it is
+ * opt-in: DSH_TU_INSTALL_CHECK=1 npm test. It still runs on its own with
+ * node test/install-check.mjs, which is what CI should call.
+ */
+const includeInstall = process.env.DSH_TU_INSTALL_CHECK === '1'
+
 const files = (await readdir(here))
   .filter((name) => name.endsWith('.mjs') && name !== 'run-all.mjs')
+  .filter((name) => includeInstall || name !== 'install-check.mjs')
   .sort()
+
+if (!includeInstall) console.log('  skip install-check        (DSH_TU_INSTALL_CHECK=1 to include)')
+
 
 let failed = 0
 for (const name of files) {

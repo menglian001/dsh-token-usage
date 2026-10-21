@@ -137,11 +137,19 @@ client.js   Client 半（纯 JS，React.createElement，无构建）
 
 ```bash
 npm install       # 装 zod（仅测试/开发需要）
-npm test          # 跑全部 11 套
+npm test          # 跑 11 套离线校验
 node test/render-check.mjs   # 跑单个
+
+# 安装验收：把本包当成陌生用户从零装一遍
+# （git archive 出干净树 → link: 解析 → import → 跑一个 harness）
+node test/install-check.mjs
+# 或随套件一起跑：
+DSH_TU_INSTALL_CHECK=1 npm test
 ```
 
 覆盖：投影折叠语义、账本写入/覆盖/压实/回扫幂等、聚合视图切换、pump 覆盖率、面板渲染（含空数据与缺 seat 的降级）。
+
+`install-check` 单独存在是有原因的：其余 harness 都在本仓库内 `import ../index.js`，那里 `node_modules` 已经存在，恰好掩盖了唯一真把人绊倒的失败模式 —— `link:` 包从**真实目录**解析依赖，干净 clone 里没有 `node_modules` 时 Host 半会以 `Cannot find package 'zod'` 失败，并连带 Client 半不注入。这个 harness 用 `git archive` 造出干净树、经 `link:` 解析、先断言 import **必须失败**、装完依赖再断言**必须成功**，所以它守的是安装路径本身。
 
 ## English
 
