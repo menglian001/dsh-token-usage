@@ -295,6 +295,56 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
   }
 }
 
+// --- 3b. a short ledger still wins when it holds more attempts ------------
+//
+// The regression this pins: `spanDays` floors a chart at 28 days so a young
+// install still draws a readable axis, and the source choice once compared day
+// spans — so a 20-day ledger holding 36,776 attempts lost to rows spanning the
+// floored 28 days and holding 22,809. The panel fell back to the truncated rows
+// and the totals dropped by gigabytes. Completeness is a count, not a span.
+{
+  // A ledger covering only a handful of days, but with far more attempts than the
+  // rows the browser holds.
+  const shortAgg = (totalTokens, requests) => ({
+    requests,
+    uncachedInputTokens: Math.round(totalTokens * 0.01),
+    outputTokens: Math.round(totalTokens * 0.001),
+    cacheReadTokens: Math.round(totalTokens * 0.989),
+    cacheWriteTokens: 0,
+    reasoningTokens: 0,
+    promptTokens: Math.round(totalTokens * 0.999),
+    completionTokens: Math.round(totalTokens * 0.001),
+    totalTokens,
+    cacheHitRate: 0.99,
+    avgLatencyMs: 1000,
+    timedRequests: requests,
+    speed: 150,
+  })
+  const shortDays = []
+  for (let i = 2; i >= 0; i -= 1) {
+    shortDays.push({ day: new Date(now - i * day).toISOString().slice(0, 10), ...shortAgg(300000, 300) })
+  }
+  const shortLedger = {
+    ...ledgerPayload,
+    days: shortDays,
+    totals: shortAgg(900000, 900),
+    models: [{ provider: 'relay-a', model: 'model-x', ...shortAgg(900000, 900) }],
+    channels: [{ provider: 'relay-a', ...shortAgg(900000, 900) }],
+    firstTime: now - 2 * day,
+    lastTime: now,
+  }
+  const { rerender } = render(sessionState([projectionRow({})]), async () => ({ ok: true, json: async () => shortLedger }))
+  await tick(); await tick()
+  const daySlot = hooks.find((slot) => slot !== undefined && slot.value === 'overview')
+  if (daySlot !== undefined) daySlot.value = 'day'
+  const tree = rerender()
+  const all = texts(tree)
+  // 900,000 tokens renders as "900.0K" with the panel's compact form.
+  check('a short but richer ledger still wins', all.some((t) => t === '900.0K'), all.filter((t) => t.includes('K')).slice(0, 6))
+  check('the day table follows the ledger, not the rows', all.some((t) => t === '300.0K'), all.filter((t) => t.includes('K')).slice(0, 6))
+  check('the source says ledger', all.some((t) => String(t).includes('本页数字读账本')), all.filter((t) => String(t).includes('本页')))
+}
+
 // --- 4. the live gauge follows the Session list's running flag ------------
 {
   const busy = {

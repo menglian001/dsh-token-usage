@@ -2404,13 +2404,16 @@ window.__ModuleLoader__.load({
       }, [projected, ledger, byId]);
       const durableDays = ledger !== undefined && Array.isArray(ledger.days) ? ledger.days : undefined;
       const durableTotals = ledger !== undefined && ledger.totals !== undefined ? ledger.totals : undefined;
-      // The durable series wins only when it reaches at least as far back as the
-      // retained rows AND holds at least as many attempts. The second test is the
-      // one that matters: a ledger that has not swept yet covers fewer Sessions than
-      // the browser already holds, and preferring it made the earlier days of the
-      // trend and the heat map shrink — a chart that shrank reads as data loss even
-      // though nothing was lost.
-      const rowSpan = spanDays(log.rows, HEATMAP_DAYS, 28);
+      // Which record is more complete decides the source — nothing else. The test is
+      // a count of attempts, because that is what "more complete" means here.
+      //
+      // This deliberately does NOT compare day spans. It used to, and that was a bug:
+      // `spanDays` has a 28-day floor so a young install still draws a readable axis,
+      // and comparing a 20-day ledger against that floored 28 rejected the ledger for
+      // being "shorter" — even when it held 36,776 attempts against the rows' 22,809.
+      // The panel then fell back to the truncated rows and the totals dropped by
+      // gigabytes. A floor meant for chart geometry must never arbitrate between two
+      // data sources.
       const durableSpan = daySpan(durableDays, HEATMAP_DAYS);
       const ledgerAhead = durableTotals !== undefined && durableTotals.requests >= log.rows.length;
       // The ledger keeps totals, not rows, so it can answer "every day", "every
@@ -2419,7 +2422,7 @@ window.__ModuleLoader__.load({
       // the window's own caveat.
       const unfiltered = range === 'all' && channelFilter === '' && modelFilter === '' && filter.trim() === '';
       const useLedgerAggregates = ledgerAhead && unfiltered && ledger !== undefined;
-      const useDurable = durableDays !== undefined && durableSpan >= rowSpan && ledgerAhead;
+      const useDurable = durableDays !== undefined && ledgerAhead;
 
       // Live concurrency, straight from the session list's own running flag: the Host
       // sets it while a Session owns a running Agent, and the list store pushes it,
@@ -2635,10 +2638,13 @@ window.__ModuleLoader__.load({
       // The heat map is a year view, so it reads every recorded day rather than the
       // filtered set — a map that emptied out when a filter changed would be
       // useless. The durable series is preferred because it is not bounded by the
-      // Session's retained window, which is what left the early months blank.
+      // Session's retained window, which is what left the early months blank. Its
+      // own span sets the width, with the same readable floor a young install needs.
       const heat = React.useMemo(
-        () => (useDurable ? heatFromDays(durableDays, durableSpan) : heatDays(log.rows, rowSpan)),
-        [useDurable, durableDays, durableSpan, log.rows, rowSpan],
+        () => (useDurable
+          ? heatFromDays(durableDays, Math.max(durableSpan, 28))
+          : heatDays(log.rows, spanDays(log.rows, HEATMAP_DAYS, 28))),
+        [useDurable, durableDays, durableSpan, log.rows],
       );
 
       const rate = React.useMemo(
