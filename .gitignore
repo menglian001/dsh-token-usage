@@ -13,3 +13,7 @@ Thumbs.db
 *.log
 .idea/
 .vscode/
+
+# Generated previews from scripts/screenshots.mjs
+docs/.preview-*.html
+docs/screenshot-*.png

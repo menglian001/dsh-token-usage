@@ -253,6 +253,16 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
   check('the hit rate is drawn as a line', line.length > 0, line.length)
   const grid = nodes(after, styleIs((s) => typeof s.bottom === 'string' && typeof s.borderTop === 'string'))
   check('the plot carries horizontal gridlines', grid.length >= 4, grid.length)
+
+  // The bars and the line share one x axis, so they must share one window. The
+  // line used to be built from the retained rows while the bars read the ledger,
+  // which on a real install left a single point drawn across thirty bars.
+  const svg = nodes(after, (node) => node.type === 'svg')
+  const viewBox = svg.length > 0 ? String(svg[0].props.viewBox ?? '') : ''
+  const ratePoints = Number(viewBox.split(' ')[2] ?? '0') / 10
+  const points = line.length > 0 ? String(line[0].props.points ?? '').trim().split(/\s+/).length : 0
+  check('the rate line covers the trend window', ratePoints === 30, { viewBox, ratePoints })
+  check('the line carries a point per day, not one', points === 30, points)
 }
 
 // --- 2. no route: the panel degrades to the projection --------------------

@@ -1113,6 +1113,41 @@ window.__ModuleLoader__.load({
      * @param hourly - Bucket by hour instead of by local day.
      * @returns One entry per bucket; `rate` is undefined where the bucket had no prompt tokens.
      */
+    /**
+     * The hit-rate series over the durable days.
+     *
+     * The trend's bars and its rate line share one x axis, so they have to share
+     * one source. When the bars come from the ledger and the line came from the
+     * retained rows, the line covered only as many days as the rows happened to
+     * span — usually one — and collapsed to a dot on a thirty-bar chart.
+     *
+     * @param days - Durable day aggregates, oldest first.
+     * @param count - How many trailing days to emit.
+     * @returns One entry per day, in the same shape `rateSeries` returns.
+     */
+    function rateFromDays(days, span) {
+      const byDay = new Map();
+      for (const day of days) {
+        if (day === null || typeof day !== 'object' || typeof day.day !== 'string') continue;
+        byDay.set(day.day, { read: count(day.cacheReadTokens), prompt: count(day.promptTokens) });
+      }
+      const now = new Date();
+      const out = [];
+      for (let index = span - 1; index >= 0; index -= 1) {
+        const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - index).getTime();
+        const key = dayKey(start);
+        const entry = byDay.get(key);
+        out.push({
+          key,
+          start,
+          label: dayLabel(start),
+          prompt: entry === undefined ? 0 : entry.prompt,
+          rate: entry !== undefined && entry.prompt > 0 ? entry.read / entry.prompt : undefined,
+        });
+      }
+      return out;
+    }
+
     function rateSeries(rows, count, hourly) {
       const keyOf = hourly ? hourKey : dayKey;
       const buckets = new Map();
@@ -2622,17 +2657,26 @@ window.__ModuleLoader__.load({
       // The trend follows the window: an hour-wide window reads as hourly buckets,
       // anything wider as one bucket per day. An explicit day window keeps its own
       // width; the open-ended ones take the span the retained rows actually cover.
+      // The trend's window, decided once: the bars and the rate line both read it,
+      // because two series on one x axis drawn from two different windows is a
+      // chart that lies about its own shape.
+      const trendSpan = React.useMemo(
+        () => (range === '7d'
+          ? 7
+          : Math.max(spanDays(filtered, TREND_DAYS, 7), Math.min(durableSpan, TREND_DAYS))),
+        [filtered, range, durableSpan],
+      );
+      const trendUsesDurable = range === 'all' && useDurable && filter.trim() === '';
       const trend = React.useMemo(
         () => (range === '24h'
           ? { unit: '小时', points: hourSeries(filtered, 24) }
           : {
               unit: '天',
-              points:
-                range === 'all' && useDurable && filter.trim() === ''
-                  ? trendFromDays(durableDays, Math.max(spanDays(filtered, TREND_DAYS, 7), Math.min(durableSpan, TREND_DAYS)))
-                  : daySeries(filtered, range === '7d' ? 7 : spanDays(filtered, TREND_DAYS, 7)),
+              points: trendUsesDurable
+                ? trendFromDays(durableDays, trendSpan)
+                : daySeries(filtered, range === '7d' ? 7 : spanDays(filtered, TREND_DAYS, 7)),
             }),
-        [filtered, range, useDurable, durableDays, durableSpan, filter],
+        [filtered, range, trendUsesDurable, durableDays, trendSpan],
       );
 
       // The heat map is a year view, so it reads every recorded day rather than the
@@ -2647,11 +2691,14 @@ window.__ModuleLoader__.load({
         [useDurable, durableDays, durableSpan, log.rows],
       );
 
+      // Same window, same source as the bars above it.
       const rate = React.useMemo(
         () => (range === '24h'
           ? rateSeries(filtered, 24, true)
-          : rateSeries(filtered, range === '7d' ? 7 : spanDays(filtered, TREND_DAYS, 7), false)),
-        [filtered, range],
+          : trendUsesDurable
+            ? rateFromDays(durableDays, trendSpan)
+            : rateSeries(filtered, range === '7d' ? 7 : spanDays(filtered, TREND_DAYS, 7), false)),
+        [filtered, range, trendUsesDurable, durableDays, trendSpan],
       );
 
       const channels = React.useMemo(() => {
