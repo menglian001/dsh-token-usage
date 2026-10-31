@@ -408,9 +408,17 @@ if (playwright === null) {
   process.exit(2)
 }
 
-const browser = await playwright.chromium.launch({ args: ['--no-sandbox', '--disable-dev-shm-usage'] })
+// A shared host may carry a browser build the installed Playwright does not
+// expect; an explicit path keeps the render reproducible there.
+const executable = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE
+const browser = await playwright.chromium.launch({
+  args: ['--no-sandbox', '--disable-dev-shm-usage'],
+  ...(executable === undefined || executable === '' ? {} : { executablePath: executable }),
+})
 for (const page of pages) {
-  const tab = await browser.newPage({ viewport: { width: 1440, height: 1400 }, deviceScaleFactor: 2 })
+  // 1x: the panel is a dense table UI, and a 2x capture of the request log is a
+  // six-hundred-kilobyte image that GitHub then downscales anyway.
+  const tab = await browser.newPage({ viewport: { width: 1440, height: 1400 }, deviceScaleFactor: 1 })
   await tab.goto('file://' + page.file, { waitUntil: 'load' })
   await tab.waitForTimeout(400)
   const box = await tab.evaluate((limit) => {
@@ -418,8 +426,15 @@ for (const page of pages) {
     if (el === null) return null
     return { x: 0, y: 0, width: 1440, height: Math.min(el.getBoundingClientRect().height, limit) }
   }, page.height)
-  await tab.screenshot({ path: join(REPO, 'docs', 'screenshot-' + page.name + '.png'), clip: box })
+  // JPEG, because these are storefront images: a 2x PNG of a full panel is
+  // several megabytes and the README does not need that.
+  await tab.screenshot({
+    path: join(REPO, 'docs', 'screenshot-' + page.name + '.jpg'),
+    type: 'jpeg',
+    quality: 86,
+    clip: box,
+  })
   await tab.close()
-  console.log('docs/screenshot-' + page.name + '.png')
+  console.log('docs/screenshot-' + page.name + '.jpg')
 }
 await browser.close()
