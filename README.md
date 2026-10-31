@@ -30,6 +30,24 @@ DSH 的 durable session log 里其实**已经**记着每次调用的 provider �
 - **渠道排行**：占比、四色构成条、请求数、命中率、合计
 - 标题下的**今日**读数（不随筛选变化）与**实时并发**
 
+### 下钻：每个数字都能点
+
+概览不是一张图。每处都在回答「这是哪几条请求」，点下去就带着筛选跳到请求日志：
+
+| 点这里 | 结果 |
+| --- | --- |
+| 趋势图的柱子 | 只看那一天（24 小时窗口下是那一小时） |
+| 热力图的格子 | 只看那一天 |
+| 渠道排行的行 | 只看这个渠道 |
+| 请求 / 合计 / 命中率 / 速度 卡片 | 请求 → 请求日志；合计 → 日期；命中率、速度 → 模型 |
+| 「更多指标」里的卡片 | 请求日志并按这一列降序（缓存读、补全、耗时、首字…） |
+| 分组视图的任意一行 | 日期行下钻到那天；渠道 / 模型行变成对应筛选 |
+| 请求日志的日期条 | 只看这一天 |
+
+下钻是一次**筛选**，不是新页面：它和渠道 / 模型 / 搜索叠加，工具栏上出现 `10-22 全天 ×` 的胶囊，点掉它或「清除筛选」即可回退。柱子、卡片、分组行、渠道行都能用键盘操作（Tab 到目标，Enter 或空格）。
+
+账本只有全量聚合，切不出一段时间，所以下钻时数字回到**保留记录**口径——页脚会写明来源；若账本对这一天知道的比列表里的行更多，条数旁边会同时给出两个数字，避免把小的那个当成一整天。
+
 ### 请求日志
 
 <p align="center">
@@ -150,7 +168,7 @@ client.js   Client 半（纯 JS，React.createElement，无构建）
 
 ```bash
 npm install       # 装 zod（仅测试/开发需要）
-npm test          # 跑 11 套离线校验
+npm test          # 跑 12 套离线校验
 node test/render-check.mjs   # 跑单个
 
 # 安装验收：把本包当成陌生用户从零装一遍
@@ -159,7 +177,7 @@ node test/install-check.mjs
 DSH_TU_INSTALL_CHECK=1 npm test
 ```
 
-覆盖：投影折叠语义、账本写入 / 覆盖 / 压实 / 回扫幂等、聚合视图切换、pump 覆盖率、面板渲染（含空数据与缺 seat 的降级）、在飞步骤计数。
+覆盖：投影折叠语义、账本写入 / 覆盖 / 压实 / 回扫幂等、聚合视图切换、pump 覆盖率、面板渲染（含空数据与缺 seat 的降级）、在飞步骤计数，以及**下钻**——真的点柱子、格子、渠道行、卡片、分组行，断言点完之后的那棵树（视图、条数、胶囊、排序、覆盖披露）。
 
 `install-check` 单独存在是有原因的：其余 harness 都在本仓库内 `import ../index.js`，那里 `node_modules` 已经存在，恰好掩盖了唯一真把人绊倒的失败模式。这个 harness 用 `git archive` 造出干净树、经 `link:` 解析、先断言 import **必须失败**、装完依赖再断言**必须成功**。
 
@@ -181,6 +199,10 @@ disk, because a session projection only retains the newest 600 rows per session.
   export; a session name opens its conversation.
 - **Model / channel / day tables** — share, requests, prompt, cache read, completion,
   total with a composition bar, hit rate, latency, speed.
+- **Drill-down** — every mark on the overview is a filter: a trend bar or a heat cell
+  opens that day (that hour, under a 24-hour window), a channel row narrows to that
+  channel, a card opens the view that explains it or the log sorted by its column,
+  and any grouped row becomes the picker value it was aggregated under.
 - **Live concurrency** — the session list's `running` flag, plus a Host-side count of
   open steps, so several calls in flight inside one conversation are visible.
 - **Durable ledger** — every settled request is appended to

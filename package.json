@@ -1,6 +1,6 @@
 {
   "name": "dsh-token-usage",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Token usage panel for the DeepSeek Harness Web GUI: a per-request ledger, four-bucket totals, a year heat map and durable JSONL storage.",
   "license": "MIT",

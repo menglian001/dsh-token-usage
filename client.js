@@ -596,10 +596,27 @@ window.__ModuleLoader__.load({
      * @param rule - Day key plus that day's count and token total.
      * @returns The rule row element.
      */
-    function dayRule(rule) {
+    function dayRule(rule, onActivate) {
       const parts = rule.key.split('-');
       const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
       const weekday = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][date.getDay()];
+      // The date is the same slice the charts drill to, so it takes the same click.
+      const activate = typeof onActivate === 'function' ? onActivate : undefined;
+      const labelProps = {
+        style: activate === undefined ? styles.dayLabel : { ...styles.dayLabel, cursor: 'pointer' },
+      };
+      if (activate !== undefined) {
+        labelProps.className = 'dsh-tu-day-link';
+        labelProps.role = 'button';
+        labelProps.tabIndex = 0;
+        labelProps.title = '只看这一天的请求';
+        labelProps.onClick = activate;
+        labelProps.onKeyDown = (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          activate();
+        };
+      }
       return h(
         'tr',
         { key: `day-${rule.key}`, className: 'dsh-tu-day' },
@@ -609,7 +626,7 @@ window.__ModuleLoader__.load({
           h(
             'div',
             { style: styles.dayRow },
-            h('span', { style: styles.dayLabel }, `${parts[1]}-${parts[2]} ${weekday}`),
+            h('span', labelProps, `${parts[1]}-${parts[2]} ${weekday}`),
             h('span', { style: styles.dayMeta }, `${exact(rule.count)} 条 · 合计 ${compact(rule.tokens)}`),
           ),
         ),
@@ -627,13 +644,35 @@ window.__ModuleLoader__.load({
      * @param total - Filtered total, which every share is taken against.
      * @returns The table row element.
      */
-    function groupRow(group, total) {
+    function groupRow(group, total, onActivate) {
       const share = total === 0 ? 0 : group.totalTokens / total;
       const cacheable = group.uncachedInputTokens + group.cacheReadTokens + group.cacheWriteTokens;
+      // A group is a filter waiting to be applied, so the row carries the action
+      // and the name carries the keyboard path to it.
+      const activate = typeof onActivate === 'function' ? onActivate : undefined;
+      const nameProps = { style: styles.groupName };
+      if (activate !== undefined) {
+        nameProps.role = 'button';
+        nameProps.tabIndex = 0;
+        nameProps.onClick = (event) => {
+          event.stopPropagation();
+          activate();
+        };
+        nameProps.onKeyDown = (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          activate();
+        };
+      }
       return h(
         'tr',
-        { key: group.key, className: 'dsh-tu-row' },
-        h('td', { style: styles.tdGroup, title: group.key }, h('span', { style: styles.groupName }, group.key)),
+        {
+          key: group.key,
+          className: activate === undefined ? 'dsh-tu-row' : 'dsh-tu-row dsh-tu-row-click',
+          onClick: activate,
+          title: activate === undefined ? undefined : '点一下看这一组的请求',
+        },
+        h('td', { style: styles.tdGroup, title: group.key }, h('span', nameProps, group.key)),
         h(
           'td',
           { style: { ...styles.td, ...styles.divider } },
@@ -1444,6 +1483,12 @@ window.__ModuleLoader__.load({
         avgLatencyMs: typeof entry.avgLatencyMs === 'number' ? entry.avgLatencyMs : undefined,
         speed: typeof entry.speed === 'number' ? entry.speed : undefined,
       };
+      // The pair behind the label, so a ledger group can be turned into the same
+      // filter a retained-row group becomes.
+      if (kind !== 'day') {
+        group.channel = entry.provider === '' ? '未标注' : entry.provider;
+        if (kind === 'model') group.model = entry.model === '' ? '未标注' : entry.model;
+      }
       return group;
     }
 
@@ -1542,10 +1587,23 @@ window.__ModuleLoader__.load({
       '@keyframes dsh-tu-pulse { 0%, 100% { opacity: 1; transform: scale(1) } 50% { opacity: .35; transform: scale(.82) } }',
       '.dsh-tu-live { animation: dsh-tu-pulse 1.6s ease-in-out infinite }',
       '@media (prefers-reduced-motion: reduce) { .dsh-tu-live { animation: none } }',
-      '.dsh-tu-channel { border-radius: var(--dsw-radius-sm); transition: background-color .12s ease }',
+      '.dsh-tu-card { cursor: pointer; transition: border-color .12s ease, background-color .12s ease }',
+      '.dsh-tu-card:hover { border-color: var(--tu-accent); background: var(--tu-subtle) }',
+      '.dsh-tu-card:hover .dsh-tu-card-go { opacity: 1; color: var(--tu-accent) }',
+      '.dsh-tu-card:focus-visible { outline: 2px solid var(--tu-accent); outline-offset: 2px }',
+      '.dsh-tu-bar { cursor: pointer; outline: 1px solid transparent; outline-offset: 1px; transition: outline-color .12s ease, filter .12s ease }',
+      '.dsh-tu-bar:hover { outline-color: var(--tu-accent); filter: brightness(1.08) }',
+      '.dsh-tu-bar:focus-visible { outline: 2px solid var(--tu-accent); outline-offset: 1px }',
+      '.dsh-tu-cell { cursor: pointer; outline: 1px solid transparent; transition: outline-color .12s ease }',
+      '.dsh-tu-cell:hover { outline-color: var(--tu-accent) }',
+      '.dsh-tu-channel { border-radius: var(--dsw-radius-sm); transition: background-color .12s ease; cursor: pointer }',
       '.dsh-tu-channel:hover { background: var(--tu-subtle) }',
+      '.dsh-tu-channel:focus-visible { outline: 2px solid var(--tu-accent); outline-offset: -2px }',
       '.dsh-tu-row > td { transition: background-color .12s ease }',
       '.dsh-tu-row:hover > td { background: var(--tu-subtle) }',
+      '.dsh-tu-row-click { cursor: pointer }',
+      '.dsh-tu-day-link:focus-visible { outline: 2px solid var(--tu-accent); outline-offset: 1px; border-radius: 3px }',
+      '.dsh-tu-row-click:hover > td { background: var(--tu-subtle) }',
       '.dsh-tu-detail > td { background: var(--tu-subtle) }',
       '.dsh-tu-zero > td { opacity: .55 }',
       '.dsh-tu-scroll::-webkit-scrollbar { width: 8px; height: 8px }',
@@ -1683,6 +1741,16 @@ window.__ModuleLoader__.load({
         background: 'var(--dsw-alias-settings-card-fill)',
         borderRadius: 'var(--dsw-radius-md)',
         minWidth: 0,
+      },
+      // Hover, focus and the arrow are the whole affordance: the card looks like a
+      // card until you touch it, then it reads as the way in.
+      statAction: { cursor: 'pointer', transition: 'border-color .12s ease, background-color .12s ease' },
+      statGo: {
+        marginLeft: 'auto',
+        fontSize: 13,
+        lineHeight: '18px',
+        color: 'var(--dsw-alias-label-tertiary)',
+        opacity: 0.55,
       },
       statLabel: {
         display: 'flex',
@@ -2067,6 +2135,15 @@ window.__ModuleLoader__.load({
       spacer: { flex: 1 },
       nav: { display: 'inline-flex', alignItems: 'center', gap: 6 },
       count: { fontSize: 12, lineHeight: '18px', color: 'var(--dsw-alias-label-secondary)', fontVariantNumeric: 'tabular-nums' },
+      // The disclosure is a warning about coverage, so it sits a step quieter than
+      // the count it qualifies but never hides.
+      gap: {
+        fontSize: 12,
+        lineHeight: '18px',
+        color: 'var(--dsw-alias-label-secondary)',
+        fontVariantNumeric: 'tabular-nums',
+        opacity: 0.85,
+      },
       button: {
         appearance: 'none',
         height: 26,
@@ -2370,15 +2447,34 @@ window.__ModuleLoader__.load({
      * @param props - Label, primary value, optional unit, and an exact figure shown dimmed below.
      * @returns The stat card.
      */
-    function Stat({ label, value, unit, hint, title, dot }) {
+    function Stat({ label, value, unit, hint, title, dot, onClick, action }) {
+      // A card that carries an action says so on hover and takes focus, so the
+      // panel is not a picture: every headline figure opens the rows behind it.
+      const clickable = typeof onClick === 'function';
+      const props = { style: clickable ? { ...styles.stat, ...styles.statAction } : styles.stat };
+      if (clickable) {
+        props.className = 'dsh-tu-card';
+        props.role = 'button';
+        props.tabIndex = 0;
+        props.title = action;
+        props.onClick = onClick;
+        props.onKeyDown = (event) => {
+          if (event.key !== 'Enter' && event.key !== ' ') return;
+          event.preventDefault();
+          onClick();
+        };
+      }
       return h(
         'div',
-        { style: styles.stat },
+        props,
         h(
           'span',
           { style: styles.statLabel },
           dot === undefined ? null : h('span', { style: { ...styles.dot, background: dot } }),
           label,
+          clickable
+            ? h('span', { style: styles.statGo, className: 'dsh-tu-card-go', 'aria-hidden': 'true' }, '›')
+            : null,
         ),
         h(
           'span',
@@ -2417,6 +2513,10 @@ window.__ModuleLoader__.load({
       // down the page by a request that lands mid-sentence.
       const [frozen, setFrozen] = React.useState(null);
       const [pageDraft, setPageDraft] = React.useState('');
+      // One slice drilled into from a chart: a day, optionally one hour of it.
+      // A bar or a heat cell is a question ("what happened here?"), and the answer
+      // is the rows, so the slice is held as a filter rather than as a new view.
+      const [drill, setDrill] = React.useState(null);
 
       // The seat is always present; the fallback only guards a foreign composition.
       const selectSessions = typeof props.useSessions === 'function' ? props.useSessions : selectEmpty;
@@ -2455,7 +2555,8 @@ window.__ModuleLoader__.load({
       // model" and "everything" — but not "one channel's rows of the last 7 days". When a
       // filter is on, the rows are the only thing that can answer, and they carry
       // the window's own caveat.
-      const unfiltered = range === 'all' && channelFilter === '' && modelFilter === '' && filter.trim() === '';
+      const unfiltered =
+        range === 'all' && channelFilter === '' && modelFilter === '' && filter.trim() === '' && drill === null;
       const useLedgerAggregates = ledgerAhead && unfiltered && ledger !== undefined;
       const useDurable = durableDays !== undefined && ledgerAhead;
 
@@ -2531,10 +2632,13 @@ window.__ModuleLoader__.load({
           if (since !== 0 && row.time < since) return false;
           if (channelFilter !== '' && channelKeyOf(row) !== channelFilter) return false;
           if (modelFilter !== '' && modelKeyOf(row) !== modelFilter) return false;
+          // A drilled slice is a filter like any other, so it composes with them.
+          if (drill !== null && dayKey(row.time) !== drill.day) return false;
+          if (drill !== null && drill.hour !== null && new Date(row.time).getHours() !== drill.hour) return false;
           if (needle === '') return true;
           return `${row.title} ${row.channel} ${row.model} ${row.sessionId}`.toLowerCase().includes(needle);
         });
-      }, [log.rows, filter, range, channelFilter, modelFilter]);
+      }, [log.rows, filter, range, channelFilter, modelFilter, drill]);
 
       // What the table shows: the live rows, or the set captured when the reader
       // paused. Everything above the table keeps updating either way.
@@ -2550,14 +2654,72 @@ window.__ModuleLoader__.load({
       // any narrowing of the view resumes the live read.
       React.useEffect(() => {
         setFrozen(null);
-      }, [filter, range, channelFilter, modelFilter]);
+      }, [filter, range, channelFilter, modelFilter, drill]);
 
-      const filtersOn = filter.trim() !== '' || channelFilter !== '' || modelFilter !== '' || range !== 'all';
+      const filtersOn =
+        filter.trim() !== '' || channelFilter !== '' || modelFilter !== '' || range !== 'all' || drill !== null;
       const clearFilters = () => {
         setFilter('');
         setChannelFilter('');
         setModelFilter('');
         setRange('all');
+        setDrill(null);
+        setPage(1);
+      };
+
+      /**
+       * Take one chart click to the rows behind it.
+       *
+       * Every interactive mark on this page asks the same question — "which
+       * requests made this number?" — and the only place that answers it is the
+       * log. So a mark never opens a dialog: it narrows the filter and goes there.
+       *
+       * @param day - Local `YYYY-MM-DD` of the slice.
+       * @param hour - Hour of the slice, or null for the whole day.
+       */
+      const drillTo = (day, hour) => {
+        setDrill({ day, hour: hour === undefined ? null : hour });
+        setView('requests');
+        setPage(1);
+        setFrozen(null);
+      };
+
+      /** The drilled slice as a short label, for the chip and the empty state. */
+      const drillLabel = drill === null
+        ? ''
+        : drill.hour === null
+          ? `${drill.day.slice(5)} 全天`
+          : `${drill.day.slice(5)} ${String(drill.hour).padStart(2, '0')} 时`;
+
+      // The ledger knows the whole drilled day; the rows only know what is still
+      // inside the browser window. When the two disagree, the smaller figure must
+      // not pass for the whole day — that is exactly how a day looked like it
+      // shrank. Say both numbers where the count is shown.
+      const drillLedgerDay = drill === null || drill.hour !== null || durableDays === undefined
+        ? undefined
+        : durableDays.find((day) => day !== null && typeof day === 'object' && day.day === drill.day);
+      const drillGap = drillLedgerDay === undefined
+        ? undefined
+        : { requests: count(drillLedgerDay.requests), tokens: count(drillLedgerDay.totalTokens) };
+
+      /** Open a view at its first page, the way a card and a chip both do. */
+      const goTo = (next) => {
+        setView(next);
+        setPage(1);
+      };
+
+      /**
+       * Open the log ordered by one column.
+       *
+       * A figure about one measurement (speed, latency, a bucket) is best
+       * answered by the rows that produced it, largest first — not by a second
+       * aggregate that would only restate the number that was clicked.
+       *
+       * @param key - Column key the table orders by.
+       */
+      const sortAndShow = (key) => {
+        setSort({ key, dir: 'desc' });
+        setView('requests');
         setPage(1);
       };
 
@@ -2647,7 +2809,24 @@ window.__ModuleLoader__.load({
           }
         }
         if (view === 'model') {
-          return groupBy(filtered, (row) => (row.model === '' ? '未标注' : `${row.channel} / ${row.model}`));
+          const labelOf = (row) => (row.model === '' ? '未标注' : `${row.channel} / ${row.model}`);
+          const list = groupBy(filtered, labelOf);
+          // The label joins two fields, so the row cannot be turned back into a
+          // filter by splitting it: a channel name may itself contain the
+          // separator. Carry the pair the label was built from instead.
+          const origin = new Map();
+          for (const row of filtered) {
+            const label = labelOf(row);
+            if (origin.has(label)) continue;
+            origin.set(label, { channel: channelKeyOf(row), model: modelKeyOf(row) });
+          }
+          for (const group of list) {
+            const source = origin.get(group.key);
+            if (source === undefined) continue;
+            group.channel = source.channel;
+            group.model = source.model;
+          }
+          return list;
         }
         if (view === 'channel') return groupBy(filtered, (row) => (row.channel === '' ? '未标注' : row.channel));
         if (view === 'day') return groupBy(filtered, (row) => dayKey(row.time));
@@ -2666,7 +2845,11 @@ window.__ModuleLoader__.load({
           : Math.max(spanDays(filtered, TREND_DAYS, 7), Math.min(durableSpan, TREND_DAYS))),
         [filtered, range, durableSpan],
       );
-      const trendUsesDurable = range === 'all' && useDurable && filter.trim() === '';
+      // A drilled slice is a time window, and a time series that ignored the window
+      // it was clicked from would contradict the cards beside it. Channel and model
+      // filters still leave the trend alone: it is a navigation surface, and the
+      // footer says which figures it follows.
+      const trendUsesDurable = range === 'all' && useDurable && filter.trim() === '' && drill === null;
       const trend = React.useMemo(
         () => (range === '24h'
           ? { unit: '小时', points: hourSeries(filtered, 24) }
@@ -2818,17 +3001,23 @@ window.__ModuleLoader__.load({
               label: '请求',
               value: exact(usage.rows),
               hint: `覆盖 ${exact(usage.sessions)} 个会话`,
+              action: '点一下到请求日志，逐条看这些请求',
+              onClick: () => goTo('requests'),
             }),
             h(Stat, {
               label: '合计 tokens',
               value: compact(usage.totals.totalTokens),
               title: exact(usage.totals.totalTokens),
               hint: `提示 ${compact(usage.totals.promptTokens)} · 补全 ${compact(usage.totals.completionTokens)}`,
+              action: '点一下到「日期」，看合计按天怎么长出来的',
+              onClick: () => goTo('day'),
             }),
             h(Stat, {
               label: '缓存命中率',
               value: hitRate,
               hint: `缓存读 ${compact(usage.totals.cacheReadTokens)} · 写 ${compact(usage.totals.cacheWriteTokens)}`,
+              action: '点一下到「模型」，看每个模型的命中率',
+              onClick: () => goTo('model'),
             }),
             h(Stat, {
               label: '输出速度',
@@ -2837,6 +3026,8 @@ window.__ModuleLoader__.load({
               // The ledger reports a pooled speed but not a sample count; showing a
               // invented zero would be worse than showing nothing.
               hint: usage.timedRows === undefined ? undefined : `${exact(usage.timedRows)} 条计时取样`,
+              action: '点一下到「模型」，看每个模型的速度',
+              onClick: () => goTo('model'),
             }),
           ),
           h(
@@ -2861,6 +3052,8 @@ window.__ModuleLoader__.load({
                 value: compact(usage.totals.uncachedInputTokens),
                 title: exact(usage.totals.uncachedInputTokens),
                 hint: `占提示 ${shareOf(usage.totals.uncachedInputTokens, usage.totals.promptTokens)}`,
+                action: '点一下到请求日志，按提示降序（未命中含在提示里）',
+                onClick: () => sortAndShow('promptTokens'),
               }),
               h(Stat, {
                 label: '缓存读',
@@ -2868,6 +3061,8 @@ window.__ModuleLoader__.load({
                 value: compact(usage.totals.cacheReadTokens),
                 title: exact(usage.totals.cacheReadTokens),
                 hint: `占提示 ${shareOf(usage.totals.cacheReadTokens, usage.totals.promptTokens)}`,
+                action: '点一下到请求日志，按缓存读降序',
+                onClick: () => sortAndShow('cacheReadTokens'),
               }),
               h(Stat, {
                 label: '缓存写',
@@ -2875,6 +3070,8 @@ window.__ModuleLoader__.load({
                 value: compact(usage.totals.cacheWriteTokens),
                 title: exact(usage.totals.cacheWriteTokens),
                 hint: `占提示 ${shareOf(usage.totals.cacheWriteTokens, usage.totals.promptTokens)}`,
+                action: '点一下到请求日志，按提示降序（缓存写含在提示里）',
+                onClick: () => sortAndShow('promptTokens'),
               }),
               h(Stat, {
                 label: '补全',
@@ -2882,16 +3079,22 @@ window.__ModuleLoader__.load({
                 value: compact(usage.totals.completionTokens),
                 title: exact(usage.totals.completionTokens),
                 hint: '生成输出',
+                action: '点一下到请求日志，按补全降序',
+                onClick: () => sortAndShow('completionTokens'),
               }),
               h(Stat, {
                 label: '平均耗时',
                 value: duration(usage.avgLatencyMs),
                 hint: `${exact(usage.latencyRows)} 条计时`,
+                action: '点一下到请求日志，按耗时降序，最慢的在最上面',
+                onClick: () => sortAndShow('latencyMs'),
               }),
               h(Stat, {
                 label: '平均首字',
                 value: duration(usage.avgFirstTokenMs),
                 hint: `${exact(usage.timedRows)} 条计时`,
+                action: '点一下到请求日志，按首字降序',
+                onClick: () => sortAndShow('firstTokenMs'),
               }),
             )
           : null,
@@ -2972,6 +3175,24 @@ window.__ModuleLoader__.load({
             setPage(1);
           },
         }),
+        // The drilled slice is a filter, so it sits with the filters and comes off
+        // the way one does — with its own chip, because it is the only one the
+        // charts can set.
+        drill === null
+          ? null
+          : h(
+              'button',
+              {
+                type: 'button',
+                style: { ...styles.button, ...styles.buttonOn },
+                title: '清除这个下钻，回到完整的时间范围',
+                onClick: () => {
+                  setDrill(null);
+                  setPage(1);
+                },
+              },
+              `${drillLabel} ×`,
+            ),
         filtersOn
           ? h(
               'button',
@@ -3042,6 +3263,16 @@ window.__ModuleLoader__.load({
               ? `共 ${exact(shown.length)} 条`
               : `${exact(grouped.length)} 组 · ${exact(filtered.length)} 条`,
         ),
+        drillGap !== undefined && drillGap.requests > shown.length
+          ? h(
+              'span',
+              {
+                style: styles.gap,
+                title: '账本按天合计是完整的；下面这张表只有还留在浏览器窗口里的记录。',
+              },
+              `账本这一天 ${exact(drillGap.requests)} 次 · ${compact(drillGap.tokens)} tokens，列表里只有 ${exact(shown.length)} 条`,
+            )
+          : null,
         view === 'requests'
           ? h(
               'span',
@@ -3114,6 +3345,34 @@ window.__ModuleLoader__.load({
 
       // The grouped views share one table shape; only the label column differs.
       const groupLabel = view === 'day' ? '日期' : view === 'channel' ? '渠道' : '渠道 / 模型';
+
+      /**
+       * What clicking one grouped row does.
+       *
+       * A day drills into that day; a channel or a channel/model pair becomes the
+       * picker value it was aggregated under. The ledger groups carry the pair for
+       * the same reason the folded rows do — a label is not a filter.
+       *
+       * @param group - One aggregated group.
+       * @returns The click handler, or undefined when the group cannot be filtered.
+       */
+      const groupAction = (group) => {
+        if (view === 'day') return () => drillTo(group.key, null);
+        if (view === 'channel') {
+          return () => {
+            setChannelFilter(group.key);
+            goTo('requests');
+          };
+        }
+        if (view === 'model' && typeof group.channel === 'string' && typeof group.model === 'string') {
+          return () => {
+            setChannelFilter(group.channel);
+            setModelFilter(group.model);
+            goTo('requests');
+          };
+        }
+        return undefined;
+      };
 
 
       /**
@@ -3193,7 +3452,7 @@ window.__ModuleLoader__.load({
           ...slice.flatMap((row, offset) => {
             const rule = dayRules.get((current - 1) * pageSize + offset);
             const parts = [];
-            if (rule !== undefined) parts.push(dayRule(rule));
+            if (rule !== undefined) parts.push(dayRule(rule, () => drillTo(rule.key, null)));
             parts.push(
               requestRow(
                 row,
@@ -3231,7 +3490,7 @@ window.__ModuleLoader__.load({
               h('th', { style: styles.th }, '速度 tok/s'),
             ),
           ),
-          h('tbody', null, ...grouped.map((group) => groupRow(group, usage.totals.totalTokens))),
+          h('tbody', null, ...grouped.map((group) => groupRow(group, usage.totals.totalTokens, groupAction(group)))),
         ),
       );
 
@@ -3242,6 +3501,8 @@ window.__ModuleLoader__.load({
       const trendPeak = trend.points.reduce((max, point) => Math.max(max, point.tokens), 0);
       const trendTotal = trend.points.reduce((sum, point) => sum + point.tokens, 0);
       const hourly = trend.unit === '小时';
+      // What one bar covers, in the words a tooltip needs.
+      const sliceWord = hourly ? '小时' : '天';
       const trendFirst = trend.points.length === 0 ? '' : trend.points[0].label;
       const trendLast = trend.points.length === 0 ? '' : trend.points[trend.points.length - 1].label;
       const trendMiddle = trend.points.length === 0
@@ -3356,7 +3617,18 @@ window.__ModuleLoader__.load({
                         'div',
                         {
                           key: point.key,
-                          title: point.label + '  共 ' + exact(point.tokens) + ' tokens',
+                          title: point.label + '  共 ' + exact(point.tokens) + ' tokens\n点一下看这一' + sliceWord + '的请求',
+                          className: 'dsh-tu-bar',
+                          role: 'button',
+                          tabIndex: 0,
+                          // The slice is the bar itself: its day, plus its hour when
+                          // the axis is hourly. Nothing is re-derived from a label.
+                          onClick: () => drillTo(dayKey(point.start), hourly ? new Date(point.start).getHours() : null),
+                          onKeyDown: (event) => {
+                            if (event.key !== 'Enter' && event.key !== ' ') return;
+                            event.preventDefault();
+                            drillTo(dayKey(point.start), hourly ? new Date(point.start).getHours() : null);
+                          },
                           style: {
                             ...styles.plotBar,
                             height: String(Math.max((point.tokens / trendPeak) * 100, 2)) + '%',
@@ -3497,11 +3769,18 @@ window.__ModuleLoader__.load({
                     : cell.tokens === 0
                       ? 'var(--tu-heat-empty)'
                       : 'var(--tu-heat-' + String(cell.level) + ')';
+                  // A cell is a hit target for the day it paints. It is deliberately
+                  // not a tab stop: three hundred and seventy of them would bury every
+                  // other control. The same day is reachable by keyboard from the trend
+                  // bars above and from the 日期 view, which is where this click lands.
                   return h('div', {
                     key: cell.key,
                     title: cell.future
                       ? undefined
-                      : localStamp(cell.date.getTime()).slice(0, 10) + '  ' + exact(cell.tokens) + ' tokens',
+                      : localStamp(cell.date.getTime()).slice(0, 10) + '  ' + exact(cell.tokens) + ' tokens'
+                        + (cell.tokens === 0 ? '' : '\n点一下看这一天的请求'),
+                    className: cell.future || cell.tokens === 0 ? undefined : 'dsh-tu-cell',
+                    onClick: cell.future || cell.tokens === 0 ? undefined : () => drillTo(cell.key, null),
                     style: { ...styles.heatCell, background, opacity: cell.future ? 0 : 1 },
                   });
                 }),
@@ -3570,6 +3849,19 @@ window.__ModuleLoader__.load({
                       style: last
                         ? { ...styles.channelRow, ...styles.channelLast }
                         : styles.channelRow,
+                      role: 'button',
+                      tabIndex: 0,
+                      title: '只看「' + group.key + '」这个渠道的请求',
+                      onClick: () => {
+                        setChannelFilter(group.key);
+                        goTo('requests');
+                      },
+                      onKeyDown: (event) => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        setChannelFilter(group.key);
+                        goTo('requests');
+                      },
                     },
                     h('span', { style: styles.channelName, title: group.key }, group.key),
                     h(
@@ -3642,7 +3934,13 @@ window.__ModuleLoader__.load({
         summary,
         toolbar,
         nothing
-          ? h('div', { style: styles.empty }, '当前时间范围与筛选条件下没有请求。放宽范围或清空筛选。')
+          ? h(
+              'div',
+              { style: styles.empty },
+              drill === null
+                ? '当前时间范围与筛选条件下没有请求。放宽范围或清空筛选。'
+                : `当前时间范围与筛选条件下没有请求。下钻的「${drillLabel}」里没有记录 —— 换一天，或点上面那个下钻按钮清除。`,
+            )
           : view === 'overview'
             ? overview
             : h(
@@ -3657,10 +3955,10 @@ window.__ModuleLoader__.load({
             'p',
             { style: styles.foot },
             view === 'overview'
-              ? '趋势与命中率按当前窗口分桶（24 小时窗口按小时，其余按天），两者共用同一 x 轴；热力图读全部记录，不受筛选影响；渠道按当前筛选。'
+              ? '趋势与命中率按当前窗口分桶（24 小时窗口按小时，其余按天），两者共用同一 x 轴；热力图读全部记录，不受筛选影响；渠道按当前筛选。点柱子或热力图格子看那一天（那一小时）的请求，点渠道行只看这个渠道，点卡片看数字背后的明细；下钻期间柱子只画那一段。'
               : view === 'requests'
-                ? '点任意一行展开该条的四桶明细（含缓存写与推理子集）。一条 = 一次计费尝试；同一轮内重试会另计一行。耗时 = 步骤开始到落盘，首字 = 首个 token 增量，速度 = 补全 ÷ 生成时间。「—」表示该次没有测到，不是 0。'
-                : '按当前筛选聚合，排序为合计降序。平均耗时是组内已计时请求的均值；速度是池化比值：仅计入补全 ≥ 100 且生成 ≥ 100ms 的请求。',
+                ? '点任意一行展开该条的四桶明细（含缓存写与推理子集）；点日期分隔行只看这一天。一条 = 一次计费尝试；同一轮内重试会另计一行。耗时 = 步骤开始到落盘，首字 = 首个 token 增量，速度 = 补全 ÷ 生成时间。「—」表示该次没有测到，不是 0。'
+                : '按当前筛选聚合，排序为合计降序；点任意一行把这一组变成筛选。平均耗时是组内已计时请求的均值；速度是池化比值：仅计入补全 ≥ 100 且生成 ≥ 100ms 的请求。',
           ),
           storageLine,
         ),

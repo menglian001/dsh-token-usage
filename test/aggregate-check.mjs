@@ -196,7 +196,7 @@ const switchTo = (rerender, id) => {
   const all = texts(tree)
   check('the strip reads the ledger', all.some((t) => t === '500.5K'), all.filter((t) => t.endsWith('K')).slice(0, 6))
   check('the source is named', all.some((t) => String(t).includes('本页数字读账本')), all.filter((t) => String(t).includes('本页')))
-  const bodyRows = nodes(tree, (node) => node.type === 'tr' && node.props.className === 'dsh-tu-row')
+  const bodyRows = nodes(tree, (node) => node.type === 'tr' && String(node.props.className ?? '').includes('dsh-tu-row'))
   check('one table row per recorded day', bodyRows.length === 5, bodyRows.length)
   check('a past day keeps its figure', all.filter((t) => t === '100.1K').length === 5, all.filter((t) => t === '100.1K').length)
 }
@@ -209,7 +209,8 @@ const switchTo = (rerender, id) => {
   const all = texts(tree)
   // With no ledger at all the footer says so instead of naming a source.
   check('the fallback is named', all.some((t) => String(t).includes('未连接')), all.filter((t) => String(t).includes('未连接')))
-  const bodyRows = nodes(tree, (node) => node.type === 'tr' && node.props.className === 'dsh-tu-row')
+  // A grouped row now also carries the click affordance class, so match the prefix.
+  const bodyRows = nodes(tree, (node) => node.type === 'tr' && String(node.props.className ?? '').includes('dsh-tu-row'))
   check('the rows answer for themselves', bodyRows.length === 1, bodyRows.length)
 }
 

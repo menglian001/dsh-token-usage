@@ -300,7 +300,7 @@ const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
     const tableText = texts(table)
     check('durable rows reach the request table', tableText.includes('relay-a'), tableText.filter((t) => t.includes('relay-a')).slice(0, 3))
     check('the table reports its row count', tableText.some((t) => t.includes('共 5 条')), tableText.filter((t) => t.includes('条')).slice(0, 6))
-    const bodyRows = nodes(table, (node) => node.type === 'tr' && node.props.className === 'dsh-tu-row')
+    const bodyRows = nodes(table, (node) => node.type === 'tr' && String(node.props.className ?? '').includes('dsh-tu-row'))
     check('one table row per durable attempt', bodyRows.length === 5, bodyRows.length)
   }
 }
